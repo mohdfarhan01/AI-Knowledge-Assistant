@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Doc Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Using FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Upload Section -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="fa-solid fa-robot"></i>
+                <h1>DocAssist AI</h1>
+            </div>
+            
+            <div class="upload-section">
+                <h2>Knowledge Base</h2>
+                <div class="drop-zone" id="drop-zone">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <p>Drag & Drop PDF/Docx here</p>
+                    <button class="btn-secondary" onclick="document.getElementById('file-input').click()">Browse Files</button>
+                    <input type="file" id="file-input" hidden multiple accept=".pdf,.docx">
+                </div>
+                
+                <div class="file-list" id="file-list">
+                    <!-- Files will appear here -->
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div class="status-item">
+                    <span class="label">Status</span>
+                    <span class="value online">Online</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Model</span>
+                    <span class="value">GPT-4 Turbo</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-interface">
+            <header class="chat-header">
+                <div class="header-info">
+                    <h2>Assistant</h2>
+                    <p>Ask me anything about your documents</p>
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" title="Clear Chat"><i class="fa-solid fa-trash-can"></i></button>
+                    <button class="icon-btn" title="Settings"><i class="fa-solid fa-gear"></i></button>
+                </div>
+            </header>
+
+            <div class="chat-history" id="chat-history">
+                <div class="message ai-message">
+                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="content">
+                        Hello! I'm your AI Document Assistant. Upload a document to the left and ask me anything about it.
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="input-wrapper">
+                    <textarea id="user-input" placeholder="Type your question here..." rows="1"></textarea>
+                    <button id="send-btn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+                <p class="disclaimer">AI can make mistakes. Please verify important information.</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+ 
