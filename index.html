@@ -1,136 +1,149 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Doc Assistant</title>
+    <title>DocAssist AI - Chat</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <!-- Using FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-
 <body>
     <div class="app-container">
-        <!-- Sidebar / Upload Section -->
+        <!-- SIDEBAR -->
         <aside class="sidebar">
             <div class="brand">
                 <i class="fa-solid fa-robot"></i>
-                <h1>DocAssist AI</h1>
+                <h1>DocAssist</h1>
             </div>
 
-            <div class="upload-section">
-                <h2>Knowledge Base</h2>
-                <div class="drop-zone" id="drop-zone">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <p>Drag & Drop PDF/Docx here</p>
-                    <button class="btn-secondary" onclick="document.getElementById('file-input').click()">Browse
-                        Files</button>
-                    <input type="file" id="file-input" hidden multiple accept=".pdf,.docx">
+            <!-- CHATS SECTION -->
+            <div class="chats-section">
+                <div class="chats-header">
+                    <h3>Chats</h3>
                 </div>
-
-                <div class="file-list" id="file-list">
-                    <!-- Files will appear here -->
+                <div class="chat-new-form">
+                    <input type="text" id="new-chat-title" placeholder="New chat..." maxlength="50" class="chat-title-input">
+                    <button id="new-chat-btn" class="btn-create-chat" title="Create new chat">
+                        <i class="fa-solid fa-plus"></i> Create
+                    </button>
                 </div>
+                <div id="chat-list" class="chat-list">
+                    <div style="padding: 15px; color: #999; font-size: 13px; text-align: center;">No chats yet</div>
+                </div>
+                <button id="logout-btn" class="btn-logout">
+                    <i class="fa-solid fa-sign-out-alt"></i> Logout
+                </button>
             </div>
 
-            <div class="status-card">
-                <div class="status-item">
-                    <span class="label">Status</span>
-                    <span class="value online">Online</span>
-                </div>
-                <div class="status-item">
-                    <span class="label">Model</span>
-                    <span class="value">GPT-4 Turbo</span>
-                </div>
-            </div>
+            <!-- UPLOAD SECTION REMOVED -->
         </aside>
 
-        <!-- Main Chat Area -->
-        <main class="chat-interface">
-            <header class="chat-header">
-                <div class="header-info">
-                    <h2>Assistant</h2>
-                    <p>Ask me anything about your documents</p>
-                </div>
-                <div class="header-actions">
-                    <button class="icon-btn" title="Clear Chat"><i class="fa-solid fa-trash-can"></i></button>
-                    <button class="icon-btn" title="Settings"><i class="fa-solid fa-gear"></i></button>
-                </div>
-            </header>
-
-            <div class="chat-history" id="chat-history">
-                <div class="message ai-message">
-                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
-                    <div class="content">
-                        Hello! I'm your AI Document Assistant. Upload a document to the left and ask me anything about
-                        it.
-                    </div>
-                </div>
+        <!-- MAIN CHAT AREA -->
+        <main class="main-area">
+            <!-- NO CHAT SELECTED STATE -->
+            <div id="no-chat-selected" class="no-chat-selected">
+                <i class="fa-solid fa-comments"></i>
+                <h2>No chat selected</h2>
+                <p>Select a chat from the list or create a new one to get started</p>
             </div>
 
-            <div class="chat-input-area">
-                <div class="input-wrapper">
-                    <textarea id="user-input" placeholder="Type your question here..." rows="1"></textarea>
-                    <button id="send-btn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+            <!-- CHAT INTERFACE -->
+            <div id="chat-interface" class="chat-interface" style="display: none;">
+                <div class="chat-header">
+                    <h2 id="chat-title-display">Select a chat</h2>
+                    <div class="chat-actions">
+                        <!-- Documents will be listed here -->
+                        <div id="chat-documents-container" class="chat-documents-container"></div>
+                    </div>
                 </div>
-                <p class="disclaimer">AI can make mistakes. Please verify important information.</p>
+                
+                <div class="messages" id="messages"></div>
+                
+                <div class="message-input-area">
+                    <div class="input-wrapper">
+                        <textarea id="message-input" placeholder="Type your message..." rows="1"></textarea>
+                        <button id="send-btn" class="send-btn" title="Send message">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                        <button id="file-upload-btn" class="upload-btn" title="Upload files">
+                            <i class="fa-solid fa-paperclip"></i>
+                        </button>
+                        <input type="file" id="file-input" hidden multiple accept=".pdf,.docx">
+                    </div>
+                    <p class="disclaimer">AI can make mistakes. Please verify important information.</p>
+                </div>
             </div>
         </main>
     </div>
 
-    <!-- Login Modal -->
-    <div id="login-modal" class="modal">
-        <div class="modal-content">
-            <h2 id="auth-title">Login</h2>
-            <form id="login-form">
-                <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username" required>
-                </div>
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <button type="submit" class="btn-primary" id="auth-submit-btn">Login</button>
-                <p class="auth-toggle">
-                    <span id="auth-toggle-text">Don't have an account?</span>
-                    <a href="#" id="auth-toggle-link">Register</a>
-                </p>
-            </form>
+    <!-- Load scripts with proper error handling -->
+    <script>
+        // First, ensure CONFIG is defined with a default value
+        window.CONFIG = window.CONFIG || { API_BASE_URL: 'http://localhost:8000' };
+        
+        function loadScript(src, callback) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => {
+                    console.log(`✅ ${src} loaded successfully`);
+                    if (callback) callback();
+                    resolve();
+                };
+                script.onerror = (error) => {
+                    console.error(`❌ Failed to load script: ${src}`, error);
+                    if (src.includes('config.js')) {
+                        console.warn('Using default configuration');
+                        resolve(); // Continue even if config fails
+                    } else {
+                        reject(error);
+                    }
+                };
+                document.body.appendChild(script);
+            });
+        }
 
-            <form id="register-form" style="display: none;">
-                <div class="form-group">
-                    <label for="reg-username">Username</label>
-                    <input type="text" id="reg-username" name="username" required minlength="3">
-                </div>
-                <div class="form-group">
-                    <label for="reg-email">Email</label>
-                    <input type="email" id="reg-email" name="email" required>
-                </div>
-                <div class="form-group">
-                    <label for="reg-fullname">Full Name</label>
-                    <input type="text" id="reg-fullname" name="full_name" required>
-                </div>
-                <div class="form-group">
-                    <label for="reg-password">Password</label>
-                    <input type="password" id="reg-password" name="password" required minlength="6">
-                </div>
-                <button type="submit" class="btn-primary" id="register-submit-btn">Register</button>
-                <p class="auth-toggle">
-                    <span id="register-toggle-text">Already have an account?</span>
-                    <a href="#" id="register-toggle-link">Login</a>
-                </p>
-            </form>
-            <div id="auth-error" class="error-message" style="display: none;"></div>
-        </div>
-    </div>
-
-    <script src="config.js"></script>
-    <script src="script.js"></script>
+        // Load scripts in sequence when DOM is ready
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('DOM fully loaded, initializing app...');
+            
+            try {
+                // Try to load config.js first, but don't fail if it doesn't exist
+                await loadScript('config.js').catch(() => {});
+                
+                // Ensure CONFIG has required properties
+                window.CONFIG = {
+                    API_BASE_URL: window.CONFIG?.API_BASE_URL || 'http://localhost:8000',
+                    // Add other default config values here
+                    ...window.CONFIG
+                };
+                
+                console.log('Using API base URL:', window.CONFIG.API_BASE_URL);
+                
+                // Now load the main script
+                await loadScript('script.js');
+                console.log('✅ All scripts loaded successfully');
+                
+                // Expose functions to window for debugging
+                window.debug = {
+                    logout: window.logout,
+                    createChat: window.createChat,
+                    CONFIG: window.CONFIG
+                };
+                
+            } catch (error) {
+                console.error('❌ Error loading scripts:', error);
+                alert('Failed to load application. Please check the console for errors.');
+            }
+        });
+        
+        // Fallback in case DOMContentLoaded already fired
+        if (document.readyState === 'interactive' || document.readyState === 'complete') {
+            document.dispatchEvent(new Event('DOMContentLoaded'));
+        }
+    </script>
 </body>
-
 </html>

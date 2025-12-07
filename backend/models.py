@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 import os
 from datetime import datetime
 
@@ -29,6 +29,58 @@ class UserModel(Base):
     hashed_password = Column(String, nullable=False)
     disabled = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# Chat model
+class ChatModel(Base):
+    __tablename__ = "chats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("UserModel", backref="chats")
+
+
+# Document model (metadata stored in Postgres, actual content indexed in Elasticsearch)
+class DocumentModel(Base):
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    es_id = Column(String, unique=True, index=True, nullable=False)
+    filename = Column(String, nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    preview = Column(Text)
+
+    user = relationship("UserModel", backref="documents")
+
+
+# Association table: which documents belong to which chats
+class ChatDocumentModel(Base):
+    __tablename__ = "chat_documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False)
+    document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    added_at = Column(DateTime, default=datetime.utcnow)
+
+    chat = relationship("ChatModel", backref="chat_documents")
+    document = relationship("DocumentModel", backref="chat_documents")
+
+
+# Message model: store chat message history
+class MessageModel(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False)
+    sender = Column(String, nullable=True)  # 'user' or 'ai' or username
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    chat = relationship("ChatModel", backref="messages")
 
 # Create all tables
 def init_db():

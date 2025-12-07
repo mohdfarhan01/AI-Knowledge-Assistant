@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocAssist AI - Login</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 420px;
+            padding: 40px;
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header i {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .login-header h1 {
+            margin: 0;
+            font-size: 28px;
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+
+        .login-header p {
+            margin: 5px 0 0 0;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Outfit', sans-serif;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .form-toggle {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-toggle a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .form-toggle a:hover {
+            color: #764ba2;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+            border-left: 4px solid #c33;
+        }
+
+        .hidden-form {
+            display: none;
+        }
+
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border-left: 4px solid #3c3;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <i class="fa-solid fa-robot"></i>
+            <h1>DocAssist AI</h1>
+            <p>Chat with your documents</p>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form">
+            <div id="login-error" class="error-message"></div>
+            
+            <div class="form-group">
+                <label for="login-username">Username</label>
+                <input type="text" id="login-username" name="username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" name="password" required>
+            </div>
+
+            <button type="submit" class="btn-submit">Login</button>
+
+            <div class="form-toggle">
+                Don't have an account? <a onclick="toggleForm()">Register</a>
+            </div>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form" class="hidden-form">
+            <div id="register-error" class="error-message"></div>
+            
+            <div class="form-group">
+                <label for="reg-username">Username</label>
+                <input type="text" id="reg-username" name="username" required minlength="3">
+            </div>
+
+            <div class="form-group">
+                <label for="reg-email">Email</label>
+                <input type="email" id="reg-email" name="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="reg-fullname">Full Name</label>
+                <input type="text" id="reg-fullname" name="full_name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="reg-password">Password</label>
+                <input type="password" id="reg-password" name="password" required minlength="6">
+            </div>
+
+            <button type="submit" class="btn-submit">Register</button>
+
+            <div class="form-toggle">
+                Already have an account? <a onclick="toggleForm()">Login</a>
+            </div>
+        </form>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        const API_URL = CONFIG.API_BASE_URL;
+
+        function toggleForm() {
+            document.getElementById('login-form').classList.toggle('hidden-form');
+            document.getElementById('register-form').classList.toggle('hidden-form');
+            document.getElementById('login-error').style.display = 'none';
+            document.getElementById('register-error').style.display = 'none';
+        }
+
+        // Login form submission
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const loginError = document.getElementById('login-error');
+            loginError.style.display = 'none';
+
+            const params = new URLSearchParams();
+            params.append('username', document.getElementById('login-username').value);
+            params.append('password', document.getElementById('login-password').value);
+
+            try {
+                const response = await fetch(`${API_URL}/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString()
+                });
+
+                if (!response.ok) {
+                    let errMsg = 'Login failed';
+                    const ct = response.headers.get('content-type') || '';
+                    if (ct.includes('application/json')) {
+                        const errJson = await response.json();
+                        errMsg = errJson.detail || JSON.stringify(errJson);
+                    }
+                    throw new Error(errMsg);
+                }
+
+                const data = await response.json();
+                if (!data || !data.access_token) throw new Error('Login succeeded but no token returned');
+
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('selected_chat_id', '');
+                window.location.href = '/index.html';
+            } catch (error) {
+                loginError.textContent = error.message;
+                loginError.style.display = 'block';
+            }
+        });
+
+        // Register form submission
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const regError = document.getElementById('register-error');
+            regError.style.display = 'none';
+
+            const formData = {
+                username: document.getElementById('reg-username').value,
+                email: document.getElementById('reg-email').value,
+                full_name: document.getElementById('reg-fullname').value,
+                password: document.getElementById('reg-password').value
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Registration failed');
+                }
+
+                // Auto-login after registration
+                const params = new URLSearchParams();
+                params.append('username', formData.username);
+                params.append('password', formData.password);
+
+                const loginResponse = await fetch(`${API_URL}/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString()
+                });
+
+                if (!loginResponse.ok) {
+                    throw new Error('Registration successful but auto-login failed. Please login manually.');
+                }
+
+                const loginData = await loginResponse.json();
+                localStorage.setItem('access_token', loginData.access_token);
+                localStorage.setItem('selected_chat_id', '');
+                window.location.href = '/index.html';
+            } catch (error) {
+                regError.textContent = error.message;
+                regError.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
