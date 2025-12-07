@@ -21,7 +21,7 @@ def create_index():
                 mappings={
                     "properties": {
                         "content": {"type": "text"},
-                        "embedding": {"type": "dense_vector", "dims": 384}, # Assuming 384 dim embeddings
+                        "embedding": {"type": "dense_vector", "dims": 384, "element_type": "float"}, # Assuming 384 dim embeddings
                         "metadata": {"type": "object"}
                     }
                 }
@@ -43,21 +43,33 @@ def index_document(doc_id, content, embedding, metadata):
         }
     )
 
-def search_documents(query_embedding, top_k=3):
+def search_documents(query_embedding, allowed_ids=None, top_k=3):
+    """Search documents by vector. If `allowed_ids` is provided, restrict search to those ES document ids."""
     if es_client is None:
         print("Elasticsearch client not available, returning empty results")
         return []
+
+    if allowed_ids is not None and len(allowed_ids) == 0:
+        return []
+
+    # Build base script_score query
+    script_score = {
+        "script_score": {
+            "query": {"match_all": {}},
+            "script": {
+                "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+                "params": {"query_vector": query_embedding}
+            }
+        }
+    }
+
+    if allowed_ids:
+        # Restrict to allowed ids using a bool filter inside the script_score query
+        script_score["script_score"]["query"] = {"bool": {"filter": {"terms": {"_id": allowed_ids}}}}
+
     response = es_client.search(
         index=INDEX_NAME,
-        query={
-            "script_score": {
-                "query": {"match_all": {}},
-                "script": {
-                    "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                    "params": {"query_vector": query_embedding}
-                }
-            }
-        },
+        query=script_score,
         size=top_k
     )
     return [hit["_source"] for hit in response["hits"]["hits"]]

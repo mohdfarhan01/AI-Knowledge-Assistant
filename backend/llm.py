@@ -13,6 +13,7 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM
 if LLM_PROVIDER == "gemini":
     try:
         import google.generativeai as genai
+        from google.api_core.exceptions import ResourceExhausted
         GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
         if GOOGLE_API_KEY:
             genai.configure(api_key=GOOGLE_API_KEY)
@@ -70,10 +71,15 @@ Question: {query}
 
 Answer:"""
             
+            logger.info(f"Calling Gemini with query: {query[:100]}")
             response = gemini_model.generate_content(prompt)
+            logger.info(f"Gemini response received: {response.text[:100]}")
             return response.text
+        except ResourceExhausted:
+            logger.warning("Gemini quota exceeded (ResourceExhausted)")
+            return "I'm currently overloaded (Gemini quota exceeded). Please try again in a minute."
         except Exception as e:
-            logger.error(f"Error generating answer with Gemini: {e}")
+            logger.error(f"Error generating answer with Gemini: {e}", exc_info=True)
             return f"I encountered an error while processing your question. Please try again."
     
     elif LLM_PROVIDER == "openai":

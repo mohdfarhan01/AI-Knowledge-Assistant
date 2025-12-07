@@ -1,318 +1,553 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
-    const fileList = document.getElementById('file-list');
-    const chatHistory = document.getElementById('chat-history');
-    const userInput = document.getElementById('user-input');
-    const sendBtn = document.getElementById('send-btn');
-    const loginModal = document.getElementById('login-modal');
-    const loginForm = document.getElementById('login-form');
-    const registerForm = document.getElementById('register-form');
-    const authToggleLink = document.getElementById('auth-toggle-link');
-    const registerToggleLink = document.getElementById('register-toggle-link');
-    const authTitle = document.getElementById('auth-title');
-    const authError = document.getElementById('auth-error');
+// Ensure CONFIG is defined
+window.CONFIG = window.CONFIG || { API_BASE_URL: 'http://localhost:8000' };
+const API_URL = window.CONFIG.API_BASE_URL;
 
-    // Use CONFIG from config.js
-    const API_URL = CONFIG.API_BASE_URL;
-    let accessToken = localStorage.getItem('access_token');
+// Debug logging
+console.log('API URL:', API_URL);
 
-    // --- Auth Handling ---
+let accessToken = '';
+let selectedChatId = '';
+let currentMessages = [];
+// =============================================
+// AUTHENTICATION & SESSION MANAGEMENT
+// =============================================
+
+function initializeAuth() {
+    console.log('Initializing auth...');
+    accessToken = localStorage.getItem('access_token') || '';
+    selectedChatId = localStorage.getItem('selected_chat_id') || '';
 
     if (!accessToken) {
-        loginModal.style.display = 'flex';
+        console.log('No access token found, redirecting to login...');
+        window.location.href = '/login.html';
+        return;
     }
 
-    // Toggle between login and register forms
-    authToggleLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        loginForm.style.display = 'none';
-        registerForm.style.display = 'block';
-        authTitle.textContent = 'Register';
-        authError.style.display = 'none';
-    });
+    console.log('✓ Auth initialized. Token:', accessToken ? accessToken.substring(0, 20) + '...' : 'none');
+}
 
-    registerToggleLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        registerForm.style.display = 'none';
-        loginForm.style.display = 'block';
-        authTitle.textContent = 'Login';
-        authError.style.display = 'none';
-    });
+function logout() {
+    console.log('Logging out...');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('selected_chat_id');
+    window.location.href = '/login.html';
+}
 
-    // Login form submission
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        authError.style.display = 'none';
+// =============================================
+// CHAT MANAGEMENT
+// =============================================
 
-        const formData = new FormData(loginForm);
-
-        try {
-            const response = await fetch(`${API_URL}/token`, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Login failed');
+async function loadChats() {
+    console.log('Loading chats...');
+    try {
+        const response = await fetch(`${API_URL}/chats`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
             }
+        });
 
-            const data = await response.json();
-            accessToken = data.access_token;
-            localStorage.setItem('access_token', accessToken);
-            loginModal.style.display = 'none';
-            loginForm.reset();
-
-            // Welcome message
-            addMessage('Welcome back! You can now upload documents and ask questions.', false);
-        } catch (error) {
-            authError.textContent = error.message;
-            authError.style.display = 'block';
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        const chats = await response.json();
+        renderChatList(chats);
+    } catch (error) {
+        console.error('Error loading chats:', error);
+        // Don't alert on load, just log
+    }
+}
+
+function renderChatList(chats) {
+    const chatList = document.getElementById('chat-list');
+    if (!chatList) return;
+
+    if (!chats || chats.length === 0) {
+        chatList.innerHTML = '<div style="padding: 15px; color: #999; font-size: 13px; text-align: center;">No chats yet</div>';
+        return;
+    }
+
+    chatList.innerHTML = chats.map(chat => `
+        <div class="chat-item ${chat.id == selectedChatId ? 'active' : ''}" 
+             data-chat-id="${chat.id}" 
+             onclick="selectChat('${chat.id}')">
+            <div class="chat-item-content">
+                <div class="chat-item-title">${escapeHtml(chat.title || 'Untitled Chat')}</div>
+                <div class="chat-item-date">${new Date(chat.created_at).toLocaleDateString()}</div>
+            </div>
+            <button class="chat-delete-btn" onclick="deleteChat(event, '${chat.id}')" title="Delete chat">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function selectChat(chatId) {
+    console.log('Selecting chat:', chatId);
+    selectedChatId = chatId;
+    localStorage.setItem('selected_chat_id', chatId);
+
+    // Update UI
+    document.querySelectorAll('.chat-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.chatId == chatId);
     });
 
-    // Register form submission
-    registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        authError.style.display = 'none';
+    // Show chat interface
+    updateChatDisplay();
 
-        const formData = {
-            username: document.getElementById('reg-username').value,
-            email: document.getElementById('reg-email').value,
-            full_name: document.getElementById('reg-fullname').value,
-            password: document.getElementById('reg-password').value
-        };
+    // Update header title
+    const chatTitleDisplay = document.getElementById('chat-title-display');
+    const chatItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"] .chat-item-title`);
+    if (chatTitleDisplay && chatItem) {
+        chatTitleDisplay.textContent = chatItem.textContent;
+    }
 
-        try {
-            const response = await fetch(`${API_URL}/register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
+    // Load messages and documents for this chat
+    loadMessages();
+    loadDocuments();
+}
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Registration failed');
-            }
+async function createChat() {
+    const titleInput = document.getElementById('new-chat-title');
+    const title = titleInput ? titleInput.value.trim() : 'New Chat';
 
-            // Auto-login after registration
-            const loginFormData = new FormData();
-            loginFormData.append('username', formData.username);
-            loginFormData.append('password', formData.password);
+    if (!title) return;
 
-            const loginResponse = await fetch(`${API_URL}/token`, {
-                method: 'POST',
-                body: loginFormData
-            });
+    try {
+        const response = await fetch(`${API_URL}/chats`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title })
+        });
 
-            if (!loginResponse.ok) {
-                throw new Error('Registration successful but auto-login failed. Please login manually.');
-            }
-
-            const loginData = await loginResponse.json();
-            accessToken = loginData.access_token;
-            localStorage.setItem('access_token', accessToken);
-            loginModal.style.display = 'none';
-            registerForm.reset();
-
-            // Welcome message
-            addMessage(`Welcome ${formData.full_name}! Your account has been created. You can now upload documents and ask questions.`, false);
-        } catch (error) {
-            authError.textContent = error.message;
-            authError.style.display = 'block';
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-    });
 
-    // --- File Upload Handling ---
+        const newChat = await response.json();
 
-    dropZone.addEventListener('click', () => fileInput.click());
+        // Clear the input
+        if (titleInput) titleInput.value = '';
 
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = 'var(--primary-color)';
-        dropZone.style.background = '#eef2ff';
-    });
+        // Reload chats
+        await loadChats();
 
-    dropZone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = 'var(--border-color)';
-        dropZone.style.background = '#f9fafb';
-    });
+        // Select the new chat
+        selectChat(newChat.id);
 
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = 'var(--border-color)';
-        dropZone.style.background = '#f9fafb';
-        handleFiles(e.dataTransfer.files);
-    });
+    } catch (error) {
+        console.error('Error creating chat:', error);
+        alert('Failed to create chat. Please try again.');
+    }
+}
 
-    fileInput.addEventListener('change', (e) => {
-        handleFiles(e.target.files);
-    });
+async function deleteChat(event, chatId) {
+    event.stopPropagation();
 
-    function handleFiles(files) {
-        Array.from(files).forEach(async file => {
-            // Validate file type
-            const validTypes = CONFIG.ALLOWED_FILE_TYPES;
-            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+    if (!confirm('Are you sure you want to delete this chat? This action cannot be undone.')) {
+        return;
+    }
 
-            if (!validTypes.includes(fileExt)) {
-                alert(`Invalid file type: ${file.name}. Only PDF and DOCX files are allowed.`);
-                return;
+    try {
+        const response = await fetch(`${API_URL}/chats/${chatId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
             }
+        });
 
-            // Validate file size
-            if (file.size > CONFIG.MAX_FILE_SIZE) {
-                alert(`File too large: ${file.name}. Maximum size is 10MB.`);
-                return;
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // If the deleted chat was selected, clear the selection
+        if (selectedChatId == chatId) {
+            selectedChatId = '';
+            localStorage.removeItem('selected_chat_id');
+            updateChatDisplay();
+        }
+
+        // Reload chats
+        await loadChats();
+
+    } catch (error) {
+        console.error('Error deleting chat:', error);
+        alert('Failed to delete chat. Please try again.');
+    }
+}
+
+// =============================================
+// MESSAGE & DOCUMENT MANAGEMENT
+// =============================================
+
+async function loadMessages() {
+    if (!selectedChatId) return;
+
+    try {
+        const response = await fetch(`${API_URL}/chats/${selectedChatId}/messages`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
             }
+        });
 
-            addFileToList(file);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-            const formData = new FormData();
-            formData.append('files', file);
+        currentMessages = await response.json();
+        renderMessages();
 
-            try {
-                const response = await fetch(`${API_URL}/ingest`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    },
-                    body: formData
-                });
+    } catch (error) {
+        console.error('Error loading messages:', error);
+    }
+}
 
-                if (response.ok) {
-                    updateFileStatus(file.name, 'Ingested');
-                } else {
-                    const error = await response.json();
-                    updateFileStatus(file.name, 'Failed');
-                    console.error('Upload error:', error);
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-                updateFileStatus(file.name, 'Error');
+function renderMessages() {
+    const messagesContainer = document.getElementById('messages');
+    if (!messagesContainer) return;
+
+    messagesContainer.innerHTML = currentMessages.map(msg => `
+        <div class="message ${msg.sender === 'user' ? 'message-user' : 'message-assistant'}">
+            <div class="message-content">
+                ${msg.content} <!-- Content is already HTML safe or needs sanitization if markdown -->
+            </div>
+        </div>
+    `).join('');
+
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+async function sendMessage() {
+    const messageInput = document.getElementById('message-input');
+    if (!messageInput || !messageInput.value.trim()) return;
+
+    const message = messageInput.value.trim();
+    messageInput.value = '';
+
+    // Optimistic UI update
+    const tempId = Date.now();
+    currentMessages.push({ id: tempId, sender: 'user', content: escapeHtml(message) });
+    renderMessages();
+
+    // Show loading state
+    const messagesContainer = document.getElementById('messages');
+    const typingIndicatorId = 'typing-indicator-' + Date.now();
+    const typingIndicatorHtml = `
+        <div id="${typingIndicatorId}" class="message message-assistant typing-indicator">
+            <div class="message-content">
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+    `;
+    messagesContainer.insertAdjacentHTML('beforeend', typingIndicatorHtml);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    try {
+        const response = await fetch(`${API_URL}/chats/${selectedChatId}/messages`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ content: message })
+        });
+
+        // Remove typing indicator
+        const indicatorElement = document.getElementById(typingIndicatorId);
+        if (indicatorElement) indicatorElement.remove();
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        // Remove optimistic message and replace with real ones
+        currentMessages = currentMessages.filter(m => m.id !== tempId);
+
+        if (result.user_message) {
+            result.user_message.sender = 'user';
+            currentMessages.push(result.user_message);
+        }
+        if (result.ai_message) {
+            result.ai_message.sender = 'ai';
+            currentMessages.push(result.ai_message);
+        } else if (result.message) {
+            // Fallback for older API structure if needed
+            currentMessages.push({ sender: 'ai', content: result.message });
+        }
+
+        renderMessages();
+
+    } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Failed to send message. Please try again.');
+
+        // Remove optimistic message and typing indicator on failure
+        currentMessages = currentMessages.filter(m => m.id !== tempId);
+        document.querySelectorAll('.typing-indicator').forEach(el => el.remove());
+
+        renderMessages();
+    }
+}
+
+async function uploadFile() {
+    const fileInput = document.getElementById('file-input');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
+
+    if (!selectedChatId) {
+        alert("Please select or create a chat first.");
+        return;
+    }
+
+    const files = Array.from(fileInput.files);
+    const formData = new FormData();
+
+    files.forEach(file => {
+        formData.append('files', file);
+    });
+
+    try {
+        const response = await fetch(`${API_URL}/chats/${selectedChatId}/documents`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        // Show success message
+        alert(`Successfully uploaded ${files.length} file(s)`);
+
+        // Clear file input
+        fileInput.value = '';
+
+        // Reload documents
+        loadDocuments();
+
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        alert('Failed to upload file(s). Please try again.');
+    }
+}
+
+async function loadDocuments() {
+    if (!selectedChatId) return;
+
+    try {
+        const response = await fetch(`${API_URL}/chats/${selectedChatId}/documents`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const docs = await response.json();
+        renderDocuments(docs);
+
+    } catch (error) {
+        console.error('Error loading documents:', error);
+    }
+}
+
+function renderDocuments(docs) {
+    const container = document.getElementById('chat-documents-container');
+    if (!container) return;
+
+    if (!docs || docs.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = docs.map(doc => {
+        const isProcessing = doc.status === 'processing';
+        return `
+        <div class="document-chip ${isProcessing ? 'processing' : ''}" title="${escapeHtml(doc.filename)}">
+            <i class="fa-solid ${isProcessing ? 'fa-spinner fa-spin' : 'fa-file-lines'}"></i>
+            <span class="doc-name">${escapeHtml(doc.filename)}</span>
+            ${isProcessing ? '<span class="status-badge">Processing</span>' : ''}
+            <button class="btn-remove-doc" onclick="deleteDocument(event, '${doc.id}')" title="Remove document">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    `}).join('');
+}
+
+async function deleteDocument(event, docId) {
+    event.stopPropagation();
+    if (!confirm('Remove this document from the chat?')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/chats/${selectedChatId}/documents/${docId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to delete document');
+
+        loadDocuments();
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        alert('Failed to remove document.');
+    }
+}
+
+// =============================================
+// UI HELPERS
+// =============================================
+
+function updateChatDisplay() {
+    const noChatSelected = document.getElementById('no-chat-selected');
+    const chatInterface = document.getElementById('chat-interface');
+
+    if (selectedChatId) {
+        if (noChatSelected) noChatSelected.style.display = 'none';
+        if (chatInterface) chatInterface.style.display = 'flex'; // Changed to flex
+    } else {
+        if (noChatSelected) noChatSelected.style.display = 'flex';
+        if (chatInterface) chatInterface.style.display = 'none';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// =============================================
+// GLOBALS
+// =============================================
+
+let newChatBtn, logoutBtn, sendBtn, fileUploadBtn, messageInput, newChatTitle, fileInput;
+
+// =============================================
+// INITIALIZATION
+// =============================================
+
+function initializeApp() {
+    console.log('========== Initializing application ==========');
+
+    // Initialize authentication
+    try {
+        initializeAuth();
+    } catch (error) {
+        console.error('Error initializing auth:', error);
+        alert('Failed to initialize authentication. Please refresh the page.');
+        return;
+    }
+
+    // Get all DOM elements
+    newChatBtn = document.getElementById('new-chat-btn');
+    logoutBtn = document.getElementById('logout-btn');
+    sendBtn = document.getElementById('send-btn');
+    fileUploadBtn = document.getElementById('file-upload-btn');
+    messageInput = document.getElementById('message-input');
+    newChatTitle = document.getElementById('new-chat-title');
+    fileInput = document.getElementById('file-input');
+
+    // Add event listeners with null checks
+    setupEventListeners();
+
+    // Load initial data
+    loadInitialData();
+
+    // Update UI based on selected chat
+    updateChatDisplay();
+}
+
+function setupEventListeners() {
+    // New chat button
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', createChat);
+    }
+
+    // Logout button
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', logout);
+    }
+
+    // Send message
+    if (sendBtn && messageInput) {
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
             }
         });
     }
 
-    function addFileToList(file) {
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item';
-        fileItem.id = `file-${file.name.replace(/\s+/g, '-')}`;
-
-        const iconClass = file.name.endsWith('.pdf') ? 'fa-file-pdf' : 'fa-file-word';
-
-        fileItem.innerHTML = `
-            <i class="fa-solid ${iconClass}"></i>
-            <div class="file-info">
-                <span class="file-name" title="${file.name}">${file.name}</span>
-                <span class="file-status">Uploading...</span>
-            </div>
-            <i class="fa-solid fa-check-circle" style="color: #10b981; display: none;"></i>
-        `;
-
-        fileList.prepend(fileItem);
+    // File upload
+    if (fileUploadBtn && fileInput) {
+        fileUploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', uploadFile);
     }
 
-    function updateFileStatus(fileName, status) {
-        const safeName = fileName.replace(/\s+/g, '-');
-        const item = document.getElementById(`file-${safeName}`);
-        if (item) {
-            const statusSpan = item.querySelector('.file-status');
-            statusSpan.textContent = status;
-            if (status === 'Ingested') {
-                item.querySelector('.fa-check-circle').style.display = 'block';
+    // New chat title (Enter key)
+    if (newChatTitle) {
+        newChatTitle.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                createChat();
             }
-        }
+        });
     }
+}
 
-    // --- Chat Handling ---
-
-    function addMessage(text, isUser = false) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
-
-        const avatarIcon = isUser ? 'fa-user' : 'fa-robot';
-
-        messageDiv.innerHTML = `
-            <div class="avatar"><i class="fa-solid ${avatarIcon}"></i></div>
-            <div class="content">${text}</div>
-        `;
-
-        chatHistory.appendChild(messageDiv);
-        chatHistory.scrollTop = chatHistory.scrollHeight;
+function loadInitialData() {
+    // Load chats if user is authenticated
+    if (accessToken) {
+        loadChats().catch(error => {
+            console.error('Error loading initial data:', error);
+        });
     }
+}
 
-    function showTypingIndicator() {
-        const indicatorDiv = document.createElement('div');
-        indicatorDiv.className = 'message ai-message typing-indicator-msg';
-        indicatorDiv.innerHTML = `
-            <div class="avatar"><i class="fa-solid fa-robot"></i></div>
-            <div class="content">
-                <div class="typing-indicator">
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                </div>
-            </div>
-        `;
-        chatHistory.appendChild(indicatorDiv);
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-        return indicatorDiv;
+// Initialize the app when the DOM is fully loaded
+function initApp() {
+    console.log('Initializing app...');
+    try {
+        initializeApp();
+    } catch (error) {
+        console.error('Error initializing app:', error);
     }
+}
 
-    async function handleSend() {
-        const text = userInput.value.trim();
-        if (!text) return;
+// Check if DOM is already loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    // DOM already loaded, initialize immediately
+    setTimeout(initApp, 0);
+}
 
-        // Add user message
-        addMessage(text, true);
-        userInput.value = '';
-        userInput.style.height = 'auto'; // Reset height
-
-        const typingIndicator = showTypingIndicator();
-
-        try {
-            const response = await fetch(`${API_URL}/query`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`
-                },
-                body: JSON.stringify({ query: text })
-            });
-
-            typingIndicator.remove();
-
-            if (response.ok) {
-                const data = await response.json();
-                addMessage(data.response);
-            } else {
-                const error = await response.json();
-                addMessage(`Sorry, I encountered an error: ${error.detail || 'Unknown error'}`);
-            }
-        } catch (error) {
-            typingIndicator.remove();
-            console.error('Query error:', error);
-            addMessage("Sorry, I couldn't reach the server. Please check your connection.");
-        }
-    }
-
-    sendBtn.addEventListener('click', handleSend);
-
-    userInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-        }
-    });
-
-    // Auto-resize textarea
-    userInput.addEventListener('input', function () {
-        this.style.height = 'auto';
-        this.style.height = (this.scrollHeight) + 'px';
-    });
-});
+// Expose functions to window for debugging
+window.app = {
+    logout,
+    createChat,
+    loadChats,
+    sendMessage,
+    uploadFile,
+    deleteChat,
+    deleteDocument
+};
